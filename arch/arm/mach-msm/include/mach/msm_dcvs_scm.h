@@ -13,6 +13,11 @@
 #ifndef _ARCH_ARM_MACH_MSM_MSM_DCVS_SCM_H
 #define _ARCH_ARM_MACH_MSM_MSM_DCVS_SCM_H
 
+enum msm_dcvs_core_type {
+	MSM_DCVS_CORE_TYPE_CPU = 0,
+	MSM_DCVS_CORE_TYPE_GPU = 1,
+};
+
 enum msm_dcvs_scm_event {
 	MSM_DCVS_SCM_IDLE_ENTER,
 	MSM_DCVS_SCM_IDLE_EXIT,

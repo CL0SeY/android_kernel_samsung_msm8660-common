@@ -13,6 +13,7 @@
 
 #include <linux/slab.h>
 #include <mach/msm_dcvs.h>
+#include <mach/msm_dcvs_scm.h>
 #include "kgsl.h"
 #include "kgsl_pwrscale.h"
 #include "kgsl_device.h"
@@ -216,7 +217,7 @@ static int msm_init(struct kgsl_device *device,
 				priv->core_info,
 				msm_set_freq, msm_get_freq, msm_idle_enable,
 				msm_set_min_freq,
-				priv->core_info->sensors[0]);
+ 				priv->core_info->sensors[0]);
 		if (priv->dcvs_core_id < 0) {
 			KGSL_PWR_ERR(device, "msm_dcvs_register_core failed");
 			goto err;

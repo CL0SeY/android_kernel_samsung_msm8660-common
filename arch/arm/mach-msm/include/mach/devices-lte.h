@@ -67,6 +67,10 @@
 #define MSM_GSBI11_QUP_I2C_BUS_ID	18
 #endif 
 
+#if defined(CONFIG_SAMSUNG_8X60_TABLET) && defined (CONFIG_STMPE811_ADC)
+#define MSM_STMPE811_I2C_BUS_ID		19
+#endif
+
 #ifdef CONFIG_SPI_QUP
 extern struct platform_device msm_gsbi1_qup_spi_device;
 extern struct platform_device msm_gsbi10_qup_spi_device;

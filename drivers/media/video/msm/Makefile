@@ -60,7 +60,11 @@ ifeq ($(CONFIG_SENSOR_ISX012),y)
 obj-$(CONFIG_SENSOR_ISX012) += sec_isx012.o  sec_apex_pmic.o
 CFLAGS_REMOVE_sec_isx012.o = -Wframe-larger-than=1024
 else
+ifeq ($(CONFIG_SENSOR_S5K5CCAF),y)
+obj-$(CONFIG_SENSOR_S5K5CCAF) += s5k5ccaf.o sec_cam_pmic.o
+else
 obj-$(CONFIG_SENSOR_M5MO) += sec_m5mo.o
+endif
 endif
 ifeq ($(CONFIG_CAMERA_VE),y)
   obj-$(CONFIG_SENSOR_S5K5BAFX) += sec_s5k5bafx.o
@@ -71,6 +75,8 @@ ifeq ($(CONFIG_SENSOR_SR200PC20M),y)
 else ifeq ($(CONFIG_SENSOR_S5K6AAFX),y)
 CFLAGS_REMOVE_sec_s5k6aafx.o = -Wframe-larger-than=1024
   obj-$(CONFIG_SENSOR_S5K6AAFX) += sec_s5k6aafx.o
+else ifeq ($(CONFIG_SENSOR_S5K5BAFX_P5),y)
+  obj-$(CONFIG_SENSOR_S5K5BAFX_P5) += sec_s5k5bafx_p5.o
 else
   obj-$(CONFIG_SENSOR_S5K5BAFX) += sec_s5k5bafx.o
 endif

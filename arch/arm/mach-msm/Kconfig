@@ -1773,6 +1773,15 @@ choice
 
 endchoice
 
+choice
+		prompt "Europe Model Name"
+		default EUR_MODEL_GT_P7320
+		depends on TARGET_LOCALE_EUR
+
+		config EUR_MODEL_GT_P7320
+			bool "GT-P7320"
+endchoice
+
 config USA_MODEL_SGH_T989D
                 depends on (USA_MODEL_SGH_T989)
                 default n             

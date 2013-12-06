@@ -258,6 +258,7 @@ static struct platform_device ion_dev;
 #define GPIO_TDMB_SPI_CLK   36
 #endif
 
+#ifdef CONFIG_VIDEO_MHL_TABLET_V1
 #define GPIO_OTG_EN		71
 #define GPIO_MHL_SCL	65
 #define GPIO_MHL_SDA	64
@@ -270,6 +271,7 @@ static struct platform_device ion_dev;
 #define PMIC_GPIO_MHL_RST				PM8058_GPIO(15) 
 #define GPIO_MHL_RST					PM8058_GPIO_PM_TO_SYS(PMIC_GPIO_MHL_RST)
 #define PMIC_GPIO_MHL_INT				PM8058_GPIO(9)
+#endif
 
 #define UART_SEL_SW          58
 #define PMIC_GPIO_UICC_DET		PM8058_GPIO(25)
@@ -1343,8 +1345,8 @@ static struct msm_otg_platform_data msm_otg_pdata = {
 //	.otg_en = qc_otg_en,
 #endif
 #ifdef CONFIG_30PIN_CONN
-	.accessory_irq = get_accessory_irq,
-	.accessory_irq_gpio = get_accessory_irq_gpio,
+//	.accessory_irq = get_accessory_irq,
+//	.accessory_irq_gpio = get_accessory_irq_gpio,
 #endif
 };
 #endif
@@ -2972,6 +2974,7 @@ static void __init msm8x60_init_dsps(void)
 #elif defined(CONFIG_FB_MSM_TVOUT)
 #define MSM_FB_EXT_BUF_SIZE  (roundup((720 * 576 * 2), 4096) * 2) /* 2 bpp x 2 pages */
 #else
+#define MSM_FB_EXT_BUF_SIZE	0
 #define MSM_FB_EXT_BUFT_SIZE	0
 #endif
 
@@ -3455,6 +3458,10 @@ static struct msm_hdmi_platform_data hdmi_msm_data = {
 	.core_power = hdmi_core_power,
 	.cec_power = hdmi_cec_power,
 	.bootup_ck = 1,
+
+	.panel_power = hdmi_panel_power,
+	.gpio_config = hdmi_gpio_config,
+
 };
 
 static struct platform_device hdmi_msm_device = {
@@ -3563,11 +3570,6 @@ static void p3_touch_resume_hw(void)
 	printk("[TSP] %s, %d\n",__func__,__LINE__);
 }
 
-static void p3_register_touch_callbacks(struct mxt_callbacks *cb)
-{
-	printk("[TSP] %s, %d\n",__func__,__LINE__);
-}
-
 #if defined(CONFIG_TOUCHSCREEN_MELFAS)
 static void register_tsp_callbacks(struct tsp_callbacks *cb)
 {
@@ -3591,7 +3593,7 @@ static struct melfas_tsi_platform_data melfas_touch_platform_data = {
 };
 #endif
 
-static const struct i2c_board_info sec_i2c_touch_info[] = {
+static struct i2c_board_info sec_i2c_touch_info[] = {
 	{
 #if defined(CONFIG_USA_OPERATOR_ATT) || defined(CONFIG_KOR_OPERATOR_SKT) || defined(CONFIG_KOR_OPERATOR_KT) || defined(CONFIG_KOR_OPERATOR_LGU) || defined(CONFIG_EUR_OPERATOR_OPEN)
 		I2C_BOARD_INFO("sec_touch", 0x48),
@@ -3781,85 +3783,7 @@ static struct platform_device fg_i2c_gpio_device = {
 struct regulator *k3g_l11;
 struct regulator *k3g_l20;
 struct regulator *k3g_lvs3;
-static int k3g_on(void);
-static int k3g_off(void);
-static struct k3g_platform_data k3g_data;
-
-static int __init gyro_device_init(void)
-{
-	int err = 0;	
-
-	k3g_l11 = regulator_get(NULL, "8058_l11");
-	if (IS_ERR(k3g_l11)) {
-		return PTR_ERR(k3g_l11);
-	}
-
-	err = regulator_set_voltage(k3g_l11, 2850000, 2850000);
-	if (err) {
-		pr_err("%s: unable to set the voltage for regulator"
-				"pm8058_l11\n", __func__);
-		regulator_put(k3g_l11);
-	}
-#if defined(CONFIG_KOR_OPERATOR_LGU)
-	k3g_lvs3 = regulator_get(NULL, "8901_lvs3");
-	if (IS_ERR(k3g_lvs3)) {
-		return PTR_ERR(k3g_lvs3);
-	}
-#elif defined(CONFIG_KOR_OPERATOR_SKT) || defined(CONFIG_KOR_OPERATOR_KT)
-	if(system_rev < 0x07){ 
-		/* rev 0.0, 0.1, 0.2,  VSENSOR_1.8V from VREG_L20A */
-		k3g_l20 = regulator_get(NULL, "8058_l20");
-		if (IS_ERR(k3g_l20)) {
-			return PTR_ERR(k3g_l20);
-		}
-
-		err = regulator_set_voltage(k3g_l20, 1800000, 1800000);
-		if (err) {
-			pr_err("%s: unable to set the voltage for regulator"
-					"pm8058_l20\n", __func__);
-			regulator_put(k3g_l20);
-			return err;
-		}
-	}
-#else
-	if(system_rev < 0x06){ 
-		/* rev < 0x06, 
-		   VSENSOR_1.8V from VREG_L20A, VSENSOR_2.85V from VREG_L11A */
-		k3g_l20 = regulator_get(NULL, "8058_l20");
-		if (IS_ERR(k3g_l20)) {
-			return PTR_ERR(k3g_l20);
-		}
-
-		err = regulator_set_voltage(k3g_l20, 1800000, 1800000);
-		if (err) {
-			pr_err("%s: unable to set the voltage for regulator"
-					"pm8058_l20\n", __func__);
-			regulator_put(k3g_l20);
-			return err;
-		}
-	}
-	else if(system_rev >= 0x06){
-		/* rev >= 0x06, 
-		   VSENSOR_1.8V from VIO_P3_1.8V, VSENSOR_2.85V from VREG_L11A */
-		printk("[K3G] power_on mapped NULL\n");
-		k3g_data.power_on = NULL; 
-		//k3g_data.power_off = NULL; 
-
-		err = regulator_enable(k3g_l11);
-		if (err) {
-			pr_err("%s: unable to enable regulator"
-					"pm8058_l11\n", __func__);
-			regulator_put(k3g_l11);
-			return err;
-		}
-	}
-	else
-		printk("[K3G] unknown rev=%%d\n", system_rev );
-#endif	
-	return 0;
-}
-
-static int k3g_on(void)
+static void k3g_on(void)
 {
 	int err = 0;	
 
@@ -3898,15 +3822,15 @@ static int k3g_on(void)
 		goto err_k3g_on;
 	}
 #endif	
-	return err;
+	return;
 
 err_k3g_on:
 	printk("[K3G] %s, error=%d\n", __func__, err );	
-	return err;
+	return;
 
 }
 
-static int k3g_off(void)
+static void k3g_off(void)
 {
 	int err = 0;	
 
@@ -3921,7 +3845,7 @@ static int k3g_off(void)
 		if(gpio_tlmm_config(GPIO_CFG(GYRO_FIFO_INT,  0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), 1))
 			printk("%s error in making GYRO_FIFO_INT Input with PD\n",__func__);
 
-		return err;
+		return;
 	}
 #endif
 
@@ -3981,12 +3905,93 @@ static int k3g_off(void)
 	if(gpio_tlmm_config(GPIO_CFG(SENSOR_GYRO_SDA,  0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), 1))
 		printk("%s error in making SENSOR_GYRO_SDA Input with PD\n",__func__);
 #endif
-	return err;
+	return;
 
 err_k3g_off:
 	printk("[K3G] %s, error=%d\n", __func__, err );	
-	return err;
+	return;
 
+}
+
+static struct k3g_platform_data k3g_data = {
+	.power_on = k3g_on,
+	.power_off = k3g_off,
+//	.get_irq=get_gyro_irq,
+};
+
+static int __init gyro_device_init(void)
+{
+	int err = 0;	
+
+	k3g_l11 = regulator_get(NULL, "8058_l11");
+	if (IS_ERR(k3g_l11)) {
+		return PTR_ERR(k3g_l11);
+	}
+
+	err = regulator_set_voltage(k3g_l11, 2850000, 2850000);
+	if (err) {
+		pr_err("%s: unable to set the voltage for regulator"
+				"pm8058_l11\n", __func__);
+		regulator_put(k3g_l11);
+	}
+#if defined(CONFIG_KOR_OPERATOR_LGU)
+	k3g_lvs3 = regulator_get(NULL, "8901_lvs3");
+	if (IS_ERR(k3g_lvs3)) {
+		return PTR_ERR(k3g_lvs3);
+	}
+	return err;
+#elif defined(CONFIG_KOR_OPERATOR_SKT) || defined(CONFIG_KOR_OPERATOR_KT)
+	if(system_rev < 0x07){ 
+		/* rev 0.0, 0.1, 0.2,  VSENSOR_1.8V from VREG_L20A */
+		k3g_l20 = regulator_get(NULL, "8058_l20");
+		if (IS_ERR(k3g_l20)) {
+			return PTR_ERR(k3g_l20);
+		}
+
+		err = regulator_set_voltage(k3g_l20, 1800000, 1800000);
+		if (err) {
+			pr_err("%s: unable to set the voltage for regulator"
+					"pm8058_l20\n", __func__);
+			regulator_put(k3g_l20);
+			return err;
+		}
+	}
+	return err;
+#else
+	if(system_rev < 0x06){ 
+		/* rev < 0x06, 
+		   VSENSOR_1.8V from VREG_L20A, VSENSOR_2.85V from VREG_L11A */
+		k3g_l20 = regulator_get(NULL, "8058_l20");
+		if (IS_ERR(k3g_l20)) {
+			return PTR_ERR(k3g_l20);
+		}
+
+		err = regulator_set_voltage(k3g_l20, 1800000, 1800000);
+		if (err) {
+			pr_err("%s: unable to set the voltage for regulator"
+					"pm8058_l20\n", __func__);
+			regulator_put(k3g_l20);
+			return err;
+		}
+	}
+	else if(system_rev >= 0x06){
+		/* rev >= 0x06, 
+		   VSENSOR_1.8V from VIO_P3_1.8V, VSENSOR_2.85V from VREG_L11A */
+		printk("[K3G] power_on mapped NULL\n");
+		k3g_data.power_on = NULL; 
+		//k3g_data.power_off = NULL; 
+
+		err = regulator_enable(k3g_l11);
+		if (err) {
+			pr_err("%s: unable to enable regulator"
+					"pm8058_l11\n", __func__);
+			regulator_put(k3g_l11);
+			return err;
+		}
+	}
+	return err;
+	//printk("[K3G] unknown rev=%%d\n", system_rev );
+#endif	
 }
 
 int get_gyro_irq(void)
@@ -4009,12 +4014,6 @@ static struct platform_device gyro_i2c_gpio_device = {
 	.dev        = {
 		.platform_data  = &gyro_i2c_gpio_data,
 	},
-};
-
-static struct k3g_platform_data k3g_data = {
-	.power_on = k3g_on,
-	.power_off = k3g_off,
-	.get_irq=get_gyro_irq,
 };
 
 static struct i2c_board_info gyro_i2c_borad_info[] = {
@@ -4319,7 +4318,7 @@ struct regulator *k3dh_akm_l11;
 struct regulator *k3dh_akm_l20;
 struct regulator *k3dh_akm_lvs3;
 
-static int k3dh_akm_on(void)
+static void k3dh_akm_on(void)
 {
 	int err = 0;	
 
@@ -4358,15 +4357,15 @@ static int k3dh_akm_on(void)
 		goto err_k3dh_akm_on;
 	}
 #endif	
-	return err;
+	return;
 
 err_k3dh_akm_on:
 	printk("[K3DH] %s, error=%d\n", __func__, err );	
-	return err;
+	return;
 
 }
 
-static int k3dh_akm_off(void)
+static void k3dh_akm_off(void)
 {
 	int err = 0;	
 
@@ -4379,7 +4378,7 @@ static int k3dh_akm_off(void)
 		if(gpio_tlmm_config(GPIO_CFG(SENSOR_AKM_SCL,  0, GPIO_CFG_INPUT, GPIO_CFG_PULL_UP, GPIO_CFG_2MA), 1))
 			printk("%s error in making SENSOR_AKM_SCL Low\n",__func__);
 
-		return err;
+		return;
 	}
 #endif
 
@@ -4439,11 +4438,11 @@ static int k3dh_akm_off(void)
 
 #endif
 
-	return err;
+	return;
 
 err_k3dh_akm_off:
 	printk("[K3DH] %s, error=%d\n", __func__, err );	
-	return err;
+	return;
 }
 
 static struct i2c_gpio_platform_data akm_i2c_gpio_data = {
@@ -5170,6 +5169,15 @@ static void pmic8058_xoadc_mpp_config(void)
 							AOUT_CTRL_DISABLE),
 	};
 
+
+#if CONFIG_BATTERY_P5LTE
+	struct pm8xxx_mpp_config_data pm8058_xoadc_mpp4 = {
+		.type	= PM8XXX_MPP_TYPE_A_INPUT,
+		.level	= PM8XXX_MPP_AIN_AMUX_CH6,
+		.control	= PM8XXX_MPP_AOUT_CTRL_DISABLE,
+	};
+#endif
+
 	for (i = 0; i < ARRAY_SIZE(xoadc_mpps); i++) {
 		rc = pm8xxx_mpp_config(xoadc_mpps[i].mpp,
 					&xoadc_mpps[i].config);
@@ -5180,12 +5188,6 @@ static void pmic8058_xoadc_mpp_config(void)
 	}
 
 #if CONFIG_BATTERY_P5LTE
-	struct pm8xxx_mpp_config_data pm8058_xoadc_mpp4 = {
-		.type	= PM8XXX_MPP_TYPE_A_INPUT,
-		.level	= PM8XXX_MPP_AIN_AMUX_CH6,
-		.control	= PM8XXX_MPP_AOUT_CTRL_DISABLE,
-	};
-
 	if  (!check_using_stmpe811()) {
 			rc = pm8xxx_mpp_config(PM8058_MPP_PM_TO_SYS(XOADC_MPP_4), &pm8058_xoadc_mpp4);
 			if (rc)
@@ -6133,12 +6135,6 @@ static int pm8058_gpios_init(void)
 		struct pm_gpio cfg;
 	};
 
-	/* Initialize JIG GPIO */
-	JIG_init();
-	
-#ifdef CONFIG_BATTERY_P5LTE
-	/* battery gpio have to be inialized firstly to remain charging current from boot */
-	extern int charging_mode_by_TA;
 	struct pm8058_gpio_cfg batt_cfgs[] = {
 		{
 			PM8058_GPIO_PM_TO_SYS(TA_DETECT),
@@ -6181,33 +6177,6 @@ static int pm8058_gpios_init(void)
 			}
 		},
 	};
-	for (i = 0; i < ARRAY_SIZE(batt_cfgs); ++i) {
-		rc = pm8xxx_gpio_config(batt_cfgs[i].gpio,
-				&batt_cfgs[i].cfg);
-		if (rc < 0) {
-			pr_err("%s batt gpio config failed\n",
-				__func__);
-			return rc;
-		}
-	}
-
-	gpio_request(PM8058_GPIO_PM_TO_SYS(TA_DETECT), "ta_detect");
-	gpio_direction_input(PM8058_GPIO_PM_TO_SYS(TA_DETECT));
-
-	gpio_request(PM8058_GPIO_PM_TO_SYS(CHG_STATE), "chg_state");
-	gpio_direction_input(PM8058_GPIO_PM_TO_SYS(CHG_STATE));
-
-	gpio_request(PM8058_GPIO_PM_TO_SYS(CHG_EN), "chg_en");
-	gpio_request(PM8058_GPIO_PM_TO_SYS(TA_CURRENT_SEL), "ta_cur_sel");
-
-	printk("charging_mode_by_TA = %d\r\n", charging_mode_by_TA);
-	if (charging_mode_by_TA==1)
-		gpio_direction_output(PM8058_GPIO_PM_TO_SYS(TA_CURRENT_SEL), 1);
-	else
-		gpio_direction_output(PM8058_GPIO_PM_TO_SYS(TA_CURRENT_SEL), 0);
-
-#endif
-
 
 	struct pm8058_gpio_cfg gpio_cfgs[] = {
 #ifdef CONFIG_MMC_MSM_CARD_HW_DETECTION
@@ -6360,41 +6329,9 @@ static int pm8058_gpios_init(void)
 #endif
 	};
 
-#ifdef CONFIG_KEYPAD_P5LTE
-	if ( system_rev < 0x4 ) {
-		struct pm8058_gpio_cfg volume_up = {
-				VOLUME_DOWN,
-				{
-					.direction	= PM_GPIO_DIR_IN,
-					.pull		= PM_GPIO_PULL_UP_31P5,
-					.vin_sel	= 2,
-					.out_strength	= PM_GPIO_STRENGTH_NO,
-					.function	= PM_GPIO_FUNC_NORMAL,
-					.inv_int_pol	= 1,
-				}
-		};
+	extern int charging_mode_by_TA;
 
-		struct pm8058_gpio_cfg volume_down = {
-				VOLUME_UP,
-				{
-					.direction	= PM_GPIO_DIR_IN,
-					.pull		= PM_GPIO_PULL_UP_31P5,
-					.vin_sel	= 2,
-					.out_strength	= PM_GPIO_STRENGTH_NO,
-					.function	= PM_GPIO_FUNC_NORMAL,
-					.inv_int_pol	= 1,
-				}
-		};
-
-		rc = pm8058_gpio_config(volume_up.gpio,
-				&volume_up.cfg);
-		rc = pm8058_gpio_config(volume_down.gpio,
-				&volume_down.cfg);
-	}
-#endif
-
-
-struct pm_gpio main_micbiase = {
+	struct pm_gpio main_micbiase = {
 		.direction      = PM_GPIO_DIR_IN,
 		.pull           = PM_GPIO_PULL_NO,
 		.vin_sel        = 2,
@@ -6402,12 +6339,17 @@ struct pm_gpio main_micbiase = {
 		.inv_int_pol    = 0,
 	};
 
-	rc = pm8xxx_gpio_config(PM8058_GPIO_PM_TO_SYS(PMIC_GPIO_MAIN_MICBIAS_EN), &main_micbiase);
-	if (rc) 
+	struct pm8058_gpio_cfg uicc_det = 
 	{
-		pr_err("%s PMIC_GPIO_MAIN_MICBIAS_EN config failed\n", __func__);
-		return rc;
-	}
+		PM8058_GPIO_PM_TO_SYS(PMIC_GPIO_UICC_DET),
+		{
+			.direction	= PM_GPIO_DIR_IN,
+			.pull		= PM_GPIO_PULL_NO,
+			.vin_sel	= 2,
+			.function 	= PM_GPIO_FUNC_NORMAL,
+			.inv_int_pol	= 0, 
+		},	
+	};
 
 #ifdef CONFIG_SAMSUNG_JACK
 	struct pm_gpio ear_det = {
@@ -6446,6 +6388,93 @@ struct pm_gpio main_micbiase = {
 		.output_value   = 0,
 	};
 
+#ifdef CONFIG_30PIN_CONN
+	struct pm_gpio accessory_check = {
+		.direction      = PM_GPIO_DIR_IN,
+		.pull           = PM_GPIO_PULL_NO,
+		.vin_sel        = 2,
+		.function       = PM_GPIO_FUNC_NORMAL,
+		.inv_int_pol    = 0,
+	};
+	int gpio_acc_check;
+#endif
+
+#endif
+
+	/* Initialize JIG GPIO */
+	JIG_init();
+	
+#ifdef CONFIG_BATTERY_P5LTE
+	/* battery gpio have to be inialized firstly to remain charging current from boot */
+	for (i = 0; i < ARRAY_SIZE(batt_cfgs); ++i) {
+		rc = pm8xxx_gpio_config(batt_cfgs[i].gpio,
+				&batt_cfgs[i].cfg);
+		if (rc < 0) {
+			pr_err("%s batt gpio config failed\n",
+				__func__);
+			return rc;
+		}
+	}
+
+	gpio_request(PM8058_GPIO_PM_TO_SYS(TA_DETECT), "ta_detect");
+	gpio_direction_input(PM8058_GPIO_PM_TO_SYS(TA_DETECT));
+
+	gpio_request(PM8058_GPIO_PM_TO_SYS(CHG_STATE), "chg_state");
+	gpio_direction_input(PM8058_GPIO_PM_TO_SYS(CHG_STATE));
+
+	gpio_request(PM8058_GPIO_PM_TO_SYS(CHG_EN), "chg_en");
+	gpio_request(PM8058_GPIO_PM_TO_SYS(TA_CURRENT_SEL), "ta_cur_sel");
+
+	printk("charging_mode_by_TA = %d\r\n", charging_mode_by_TA);
+	if (charging_mode_by_TA==1)
+		gpio_direction_output(PM8058_GPIO_PM_TO_SYS(TA_CURRENT_SEL), 1);
+	else
+		gpio_direction_output(PM8058_GPIO_PM_TO_SYS(TA_CURRENT_SEL), 0);
+
+#endif
+
+
+#ifdef CONFIG_KEYPAD_P5LTE
+	if ( system_rev < 0x4 ) {
+		struct pm8058_gpio_cfg volume_up = {
+				VOLUME_DOWN,
+				{
+					.direction	= PM_GPIO_DIR_IN,
+					.pull		= PM_GPIO_PULL_UP_31P5,
+					.vin_sel	= 2,
+					.out_strength	= PM_GPIO_STRENGTH_NO,
+					.function	= PM_GPIO_FUNC_NORMAL,
+					.inv_int_pol	= 1,
+				}
+		};
+
+		struct pm8058_gpio_cfg volume_down = {
+				VOLUME_UP,
+				{
+					.direction	= PM_GPIO_DIR_IN,
+					.pull		= PM_GPIO_PULL_UP_31P5,
+					.vin_sel	= 2,
+					.out_strength	= PM_GPIO_STRENGTH_NO,
+					.function	= PM_GPIO_FUNC_NORMAL,
+					.inv_int_pol	= 1,
+				}
+		};
+
+		rc = pm8058_gpio_config(volume_up.gpio,
+				&volume_up.cfg);
+		rc = pm8058_gpio_config(volume_down.gpio,
+				&volume_down.cfg);
+	}
+#endif
+
+	rc = pm8xxx_gpio_config(PM8058_GPIO_PM_TO_SYS(PMIC_GPIO_MAIN_MICBIAS_EN), &main_micbiase);
+	if (rc) 
+	{
+		pr_err("%s PMIC_GPIO_MAIN_MICBIAS_EN config failed\n", __func__);
+		return rc;
+	}
+
+#ifdef CONFIG_SAMSUNG_JACK
 	rc = pm8xxx_gpio_config(PM8058_GPIO_PM_TO_SYS(PMIC_GPIO_EAR_DET), &ear_det);
 	if (rc) {
 		pr_err("%s PMIC_GPIO_EAR_DET config failed\n", __func__);
@@ -6503,15 +6532,6 @@ struct pm_gpio main_micbiase = {
 	}
 
 #ifdef CONFIG_30PIN_CONN
-	struct pm_gpio accessory_check = {
-		.direction      = PM_GPIO_DIR_IN,
-		.pull           = PM_GPIO_PULL_NO,
-		.vin_sel        = 2,
-		.function       = PM_GPIO_FUNC_NORMAL,
-		.inv_int_pol    = 0,
-	};
-	int gpio_acc_check;
-
 	if (system_rev < 0x04)
 		gpio_acc_check = PMIC_GPIO_ACCESSORY_CHECK;
 	else
@@ -6525,18 +6545,6 @@ struct pm_gpio main_micbiase = {
 	}
 #endif
 
-	struct pm8058_gpio_cfg uicc_det = 
-	{
-		PM8058_GPIO_PM_TO_SYS(PMIC_GPIO_UICC_DET),
-		{
-			.direction	= PM_GPIO_DIR_IN,
-			.pull		= PM_GPIO_PULL_NO,
-			.vin_sel	= 2,
-			.function 	= PM_GPIO_FUNC_NORMAL,
-			.inv_int_pol	= 0, 
-		},	
-	};
-		
 	rc = pm8xxx_gpio_config( uicc_det.gpio, &uicc_det.cfg );
 	if( rc < 0 ){
 		pr_err("%s uicc_det gpio config failed\n", __func__ );
@@ -7511,7 +7519,6 @@ static struct i2c_registry msm8x60_i2c_devices[] __initdata = {
 		ARRAY_SIZE(fg_i2c_devices),
 	},
 #endif
-	
 	{
 		I2C_SURF | I2C_FFA | I2C_DRAGON,
 		MSM_GSBI3_QUP_I2C_BUS_ID,
@@ -10034,6 +10041,9 @@ static void __init msm8x60_init(struct msm_board_data *board_data)
 	uint32_t soc_platform_version;
 
 #ifdef CONFIG_SEC_DEBUG
+	/* Add debug level node */
+	struct device *platform = surf_devices[0]->dev.parent;
+	int ret = 0;
 	sec_debug_init();
 #endif
 
@@ -10248,8 +10258,6 @@ static void __init msm8x60_init(struct msm_board_data *board_data)
 
 #ifdef CONFIG_SEC_DEBUG
 	/* Add debug level node */
-	int ret = 0;
-	struct device *platform = surf_devices[0]->dev.parent;
 	ret = device_create_file(platform, &dev_attr_sec_debug_level);
 	if (ret)
 		printk("Fail to create sec_debug_level file\n");
