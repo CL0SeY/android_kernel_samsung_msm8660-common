@@ -1342,6 +1342,18 @@ static DEVICE_ATTR(console, S_IWUSR | S_IRUGO, show_msm_console,
 						set_msm_console);
 #else
 #define MSM_HSL_CONSOLE	NULL
+/*
+ * get_console_state - check the per-port serial console state.
+ * @port: uart_port structure describing the port
+ *
+ * Return the state of serial console availability on port.
+ * return 1: If serial console is enabled on particular UART port.
+ * return 0: If serial console is disabled on particular UART port.
+ */
+static int get_console_state(struct uart_port *port)
+{
+	return 0;
+}
 #endif
 
 static struct uart_driver msm_hsl_uart_driver = {

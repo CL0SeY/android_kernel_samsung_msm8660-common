@@ -47,7 +47,7 @@
 #if defined(CONFIG_TARGET_SERIES_P5LTE)\
 	&& defined(CONFIG_USA_OPERATOR_ATT)
 #undef USE_CID_CHECK
-#define OOB_INTR_ONLY
+// #define OOB_INTR_ONLY
 #define READ_MACADDR
 #endif
 

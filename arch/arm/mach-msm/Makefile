@@ -204,6 +204,7 @@ ifdef CONFIG_MSM_SUBSYSTEM_RESTART
 	obj-$(CONFIG_ARCH_MSM8X60) += modem-8660.o lpass-8660.o
 endif
 
+obj-$(CONFIG_SAMSUNG_8X60_TABLET) += tablet_switch.o
 obj-$(CONFIG_USB_SWITCH_FSA9480)   += sec_switch.o
 obj-$(CONFIG_MSM_SYSMON_COMM) += sysmon.o
 obj-$(CONFIG_MSM_MODEM_8960) += modem-8960.o
@@ -332,7 +333,11 @@ obj-$(CONFIG_MSM_SHOW_RESUME_IRQ) += msm_show_resume_irq.o
 obj-$(CONFIG_BT_MSM_PINTEST)  += btpintest.o
 obj-$(CONFIG_MSM_FAKE_BATTERY) += fish_battery.o
 obj-$(CONFIG_MSM_RPC_VIBRATOR) += msm_vibrator.o
+ifdef CONFIG_SAMSUNG_8X60_TABLET
+obj-$(CONFIG_MSM_NATIVE_RESTART) += restart_tablet.o
+else
 obj-$(CONFIG_MSM_NATIVE_RESTART) += restart.o
+endif
 
 obj-$(CONFIG_MSM_PROC_COMM_REGULATOR) += proccomm-regulator.o
 ifdef CONFIG_MSM_PROC_COMM_REGULATOR
@@ -347,7 +352,13 @@ obj-$(CONFIG_MSM_RTB) += msm_rtb.o
 obj-$(CONFIG_MSM_CACHE_ERP) += cache_erp.o
 obj-$(CONFIG_MSM_CACHE_DUMP) += msm_cache_dump.o
 obj-$(CONFIG_MSM_CPU_PWRCTL) +=  msm_cpu_pwrctl.o
+
+ifdef CONFIG_SAMSUNG_8X60_TABLET
+obj-$(CONFIG_SEC_DEBUG)		+= sec_debug_tablet.o sec_getlog.o sec_gaf.o
+else
 obj-$(CONFIG_SEC_DEBUG)		+= sec_debug.o sec_getlog.o sec_gaf.o
+endif
+
 
 obj-$(CONFIG_SEC_LOG_LAST_KMSG) += sec_last_log.o
 

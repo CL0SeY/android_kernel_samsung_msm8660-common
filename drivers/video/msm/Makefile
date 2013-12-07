@@ -1,6 +1,10 @@
 obj-y := msm_fb.o
 
+ifeq ($(CONFIG_SAMSUNG_8X60_TABLET),y)
+obj-$(CONFIG_FB_MSM_LOGO) += logo_tablet.o
+else
 obj-$(CONFIG_FB_MSM_LOGO) += logo.o
+endif
 obj-$(CONFIG_FB_BACKLIGHT) += msm_fb_bl.o
 
 ifeq ($(CONFIG_FB_MSM_MDP_HW),y)
@@ -12,7 +16,9 @@ obj-$(CONFIG_DEBUG_FS) += mdp_debugfs.o
 
 ifeq ($(CONFIG_FB_MSM_MDP40),y)
 obj-y += mdp4_util.o
+ifneq ($(CONFIG_SAMSUNG_8X60_TABLET),y)
 obj-y += mdp4_video_enhance.o
+endif
 else
 obj-y += mdp_hw_init.o
 obj-y += mdp_ppp.o
@@ -71,6 +77,7 @@ msm_mipi-objs := mipi_dsi.o mipi_dsi_host.o
 obj-$(CONFIG_FB_MSM_MIPI_DSI) += msm_mipi.o
 
 # MIPI manufacture
+obj-$(CONFIG_FB_MSM_MIPI_DSI_SAMSUNG) += mipi_samsung.o
 obj-$(CONFIG_FB_MSM_MIPI_DSI_TOSHIBA) += mipi_toshiba.o
 obj-$(CONFIG_FB_MSM_MIPI_DSI_NOVATEK) += mipi_novatek.o
 obj-$(CONFIG_FB_MSM_MIPI_DSI_ORISE) += mipi_orise.o
@@ -83,7 +90,13 @@ obj-$(CONFIG_FB_MSM_MIPI_DSI_S6E8AA0_WXGA_Q1) += smart_dimming.o
 obj-$(CONFIG_FB_MSM_MIPI_DSI_S6E8AA0_HD720) += mipi_s6e8aa0_hd720.o
 obj-$(CONFIG_FB_MSM_MIPI_DSI_S6E8AA0_HD720) += smart_dimming.o
 obj-$(CONFIG_FB_MSM_MIPI_DSI_S6E8AA0_WXGA) += mipi_s6e8aa0_wxga.o
+ifeq ($(CONFIG_CMC624_P8LTE),y)
+obj-$(CONFIG_FB_MSM_MIPI_DSI_ESD_REFRESH) += sec_mipi_lcd_esd_refresh_p8.o sec_cmc_esd_refresh_p8.o
+else
 obj-$(CONFIG_FB_MSM_MIPI_DSI_ESD_REFRESH) += sec_mipi_lcd_esd_refresh.o
+endif
+obj-$(CONFIG_FB_MSM_MIPI_DSI_S6E8AB0_WXGA) += mipi_s6e8ab0_wxga.o
+obj-$(CONFIG_FB_MSM_MIPI_DSI_S6E8AB0_WXGA) += smart_dimming_s6e8ab0.o
 
 # MIPI Bridge
 obj-$(CONFIG_FB_MSM_MIPI_DSI_TC358764_DSI2LVDS) += mipi_tc358764_dsi2lvds.o
@@ -128,6 +141,7 @@ obj-y += mipi_chimei_wxga_pt.o
 obj-y += mipi_chimei_wuxga.o
 obj-y += mipi_truly_video_wvga_pt.o
 else
+obj-$(CONFIG_FB_MSM_MIPI_SAMSUNG_VIDEO_WVGA) += mipi_samsung_video_wvga.o
 obj-$(CONFIG_FB_MSM_MIPI_TOSHIBA_VIDEO_WVGA_PT) += mipi_toshiba_video_wvga_pt.o
 obj-$(CONFIG_FB_MSM_MIPI_TOSHIBA_VIDEO_WSVGA_PT) += mipi_toshiba_video_wsvga_pt.o
 obj-$(CONFIG_FB_MSM_MIPI_TOSHIBA_VIDEO_WUXGA) += mipi_toshiba_video_wuxga.o
@@ -144,10 +158,13 @@ obj-$(CONFIG_FB_MSM_MIPI_CHIMEI_WUXGA) += mipi_chimei_wuxga.o
 obj-$(CONFIG_FB_MSM_MIPI_S6D6AA0_WXGA_PT) += mipi_s6d6aa0_wxga_pt.o
 obj-$(CONFIG_FB_MSM_MIPI_S6E8AA0_HD720_PT) += mipi_s6e8aa0_hd720_pt.o
 obj-$(CONFIG_FB_MSM_MIPI_S6E8AA0_WXGA_Q1_PT) += mipi_s6e8aa0_wxga_q1_pt.o
+obj-$(CONFIG_FB_MSM_MIPI_S6E8AB0_WXGA_PT) += mipi_s6e8ab0_wxga_pt.o
 endif
 
 obj-$(CONFIG_FB_MSM_LCDC_PANEL) += lcdc_panel.o
 obj-$(CONFIG_FB_MSM_LCDC_P5LTE_WXGA) += lcdc_pxlte.o
+obj-$(CONFIG_CMC623_P5LTE) += pxlte_cmc623.o cmc623_sysfs.o
+obj-$(CONFIG_CMC624_P8LTE) += pxlte_cmc624.o cmc624_sysfs.o 
 ifndef CONFIG_TARGET_SERIES_DALI # kmj_imsi
 obj-$(CONFIG_FB_MSM_LCDC_LD9040_WVGA) += lcdc_ld9040.o
 endif
@@ -184,6 +201,7 @@ obj-$(CONFIG_FB_MSM_WRITEBACK_MSM_PANEL) += mdp4_overlay_writeback.o
 obj-$(CONFIG_MSM_VIDC_1080P) += vidc/
 obj-$(CONFIG_MSM_VIDC_720P) += vidc/
 #MHL
+obj-$(CONFIG_VIDEO_MHL_V1) += mhl_v1/
 obj-$(CONFIG_VIDEO_MHL_V2) += mhl_v2/
 else
 obj-$(CONFIG_FB_MSM_EBI2) += ebi2_host.o

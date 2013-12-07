@@ -616,7 +616,7 @@ void fg_prevent_early_poweroff(int vcell, int fg_soc)
 	pr_info("%s : fg_soc=%d, soc=%d (0x%04x), vcell=%d\n", __func__, fg_soc, repsoc, repsoc_data, vcell);
 
 	if(vcell > POWER_OFF_VOLTAGE_HIGH_MARGIN) {
-		pr_debug("%s : Keep RemCapMix & RemCapRep to 1.5%!!\n", __func__);
+		// pr_debug("%s : Keep RemCapMix & RemCapRep to 1.5%!!\n", __func__);
 		if(is_first_time) {
 			/* save RemCapMix and RemCapRep it as RemCapMix_1%, RemCapRep_1% */
 			is_first_time = 0;
