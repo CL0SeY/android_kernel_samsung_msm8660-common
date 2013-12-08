@@ -55,7 +55,6 @@ struct isa1200_vibrator_drvdata {
 	spinlock_t lock;
 	bool running;
 	int gpio_en;
-	int timeout;
 	int max_timeout;
 	u8 ctrl0;
 	u8 ctrl1;
@@ -264,12 +263,34 @@ static void isa1200_vibrator_off(struct isa1200_vibrator_drvdata *data)
 #endif
 }
 
+static void isa1200_vibrator_set_val(struct isa1200_vibrator_drvdata *data, int val)
+{
+	if (0 == val) {
+		if (!data->running)
+			return ;
+
+		data->running = false;
+		isa1200_vibrator_off(data);
+		clk_disable(data->vib_clk);
+//		gpio_set_value(ddata->gpio_en, 1);		//HASH
+
+	} else {
+		if (data->running)
+			return ;
+
+		data->running = true;
+
+		clk_enable(data->vib_clk);
+		mdelay(1);
+		isa1200_vibrator_on(data);
+	}
+
+}
+
 static enum hrtimer_restart isa1200_vibrator_timer_func(struct hrtimer *_timer)
 {
 	struct isa1200_vibrator_drvdata *data =
 		container_of(_timer, struct isa1200_vibrator_drvdata, timer);
-
-	data->timeout = 0;
 
 	schedule_work(&data->work);
 	return HRTIMER_NORESTART;
@@ -280,21 +301,7 @@ static void isa1200_vibrator_work(struct work_struct *_work)
 	struct isa1200_vibrator_drvdata *data =
 		container_of(_work, struct isa1200_vibrator_drvdata, work);
 
-	if (0 == data->timeout) {
-		if (!data->running)
-			return ;
-
-		data->running = false;
-		isa1200_vibrator_off(data);
-		clk_disable(data->vib_clk);
-	} else {
-		if (data->running)
-			return ;
-		data->running = true;
-		clk_enable(data->vib_clk);
-		mdelay(1);
-		isa1200_vibrator_on(data);
-	}
+	isa1200_vibrator_set_val(data, 0);
 }
 
 static int isa1200_vibrator_get_time(struct timed_output_dev *_dev)
@@ -320,10 +327,9 @@ static void isa1200_vibrator_enable(struct timed_output_dev *_dev, int value)
 	pr_info("[VIB] time = %dms\n", value);
 #endif
 	cancel_work_sync(&data->work);
-	hrtimer_cancel(&data->timer);
-	data->timeout = value;
-	schedule_work(&data->work);
 	spin_lock_irqsave(&data->lock, flags);
+	hrtimer_cancel(&data->timer);
+	isa1200_vibrator_set_val(data, value);
 	if (value > 0) {
 		if (value > data->max_timeout)
 			value = data->max_timeout;
@@ -461,6 +467,16 @@ static int __devinit isa1200_vibrator_i2c_probe(struct i2c_client *client,	const
 
 	ddata->client = client;
 	ddata->gpio_en = pdata->gpio_en;
+#if defined(CONFIG_TARGET_SERIES_P8LTE) || defined(CONFIG_TARGET_SERIES_P5LTE) || defined(CONFIG_TARGET_SERIES_P4LTE)	
+	android_vib_clk = clk_get_sys("vibrator","core_clk");
+	if(IS_ERR(android_vib_clk)) {
+		printk("android vib clk failed!!!\n");
+		ddata->vib_clk = NULL;
+	} else {
+		clk_set_rate(android_vib_clk, 27000000);
+		ddata->vib_clk = android_vib_clk;
+	}
+#else
 	android_vib_clk = clk_get_sys("msm_sys_fpb","bus_clk");
 	if(IS_ERR(android_vib_clk)) {
 		printk("android vib clk failed!!!\n");
@@ -468,6 +484,7 @@ static int __devinit isa1200_vibrator_i2c_probe(struct i2c_client *client,	const
 	} else {
 		ddata->vib_clk = android_vib_clk;
 	}
+#endif
 	ddata->max_timeout = pdata->max_timeout;
 	ddata->ctrl0 = pdata->ctrl0;
 	ddata->ctrl1 = pdata->ctrl1;
