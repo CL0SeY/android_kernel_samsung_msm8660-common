@@ -243,18 +243,10 @@ static void lpm_mode_check(struct battery_data *battery)
 	if (!charging_mode_from_boot)
 		return;
 
-	if (check_ta_conn(battery)) {
-		battery->charging_mode_booting = 1;
-		lpm_mode_flag = 1;
-		pr_info("%s: charging_mode_booting(%d)\n", __func__,
-			battery->charging_mode_booting);
-	} else {
-#if !defined(CONFIG_KOR_OPERATOR_SKT) && !defined(CONFIG_KOR_OPERATOR_KT) && !defined(CONFIG_KOR_OPERATOR_LGU)
-		pr_info("%s: ta no longer connected, powering off\n", __func__);
-		if (pm_power_off)
-			pm_power_off();
-#endif
-	}
+	battery->charging_mode_booting = 1;
+	lpm_mode_flag = 1;
+	pr_info("%s: charging_mode_booting(%d)\n", __func__,
+		battery->charging_mode_booting);
 }
 #endif
 
@@ -313,6 +305,23 @@ static void p5_program_alarm(struct battery_data *battery, int seconds, int init
 	alarm_start_range(&battery->alarm, next, ktime_add(next, slack));
 }
 
+#if defined(CONFIG_KOR_OPERATOR_SKT) || defined(CONFIG_KOR_OPERATOR_KT) || defined(CONFIG_KOR_OPERATOR_LGU)
+/* keep 100% level incase of cable out and full charged. */
+static void p5_check_full_charged(struct battery_data *battery)
+{
+	int fullcap = get_fuelgauge_value(FG_FULLCAP);
+	int remcap = get_fuelgauge_value(FG_REMCAP_REP);
+
+	if (battery->info.batt_is_full) {
+		if (fullcap > remcap) {
+			pr_info("%s: forcely, adjust full_cap!\n",
+				__func__);
+			fg_set_full_charged();
+		}
+	}
+}
+#endif
+
 static void p5_get_cable_status(struct battery_data *battery)
 {
 	if (check_ta_conn(battery)) {
@@ -332,7 +341,10 @@ static void p5_get_cable_status(struct battery_data *battery)
 			//IRQ_TYPE_LEVEL_LOW);
 		if (battery->pdata->inform_charger_connection)
 			battery->pdata->inform_charger_connection(false);
-		
+#if defined(CONFIG_KOR_OPERATOR_SKT) || defined(CONFIG_KOR_OPERATOR_KT) || defined(CONFIG_KOR_OPERATOR_LGU)
+		/* keep 100% level incase of cable out and full charged. */
+		p5_check_full_charged(battery);
+#endif
 		battery->info.batt_improper_ta = 0;  // clear flag
 	}
 
@@ -453,9 +465,11 @@ static int p5_get_bat_level(struct power_supply *bat_ps)
 	int fg_vcell;
 	int fg_current;
 	int avg_current;
+#if 0 /* no need for FG Recovery */ 
 	int recover_flag = 0;
 
 	recover_flag = fg_check_cap_corruption();
+#endif
 
 	/* check VFcapacity every five minutes */
 	if (!(battery->fg_chk_cnt++ % 10)) {
@@ -468,7 +482,8 @@ static int p5_get_bat_level(struct power_supply *bat_ps)
 		pr_info("Can't read soc!!!");
 		fg_soc = battery->info.level;
 	}
-
+	
+#if 0 /* no need for FG Recovery */ 
 	if (!check_jig_on() && !max17042_chip_data->info.low_batt_comp_flag) {
 		if (((fg_soc+5) < max17042_chip_data->info.previous_repsoc) ||
 			(fg_soc > (max17042_chip_data->info.previous_repsoc+5)))
@@ -486,6 +501,7 @@ static int p5_get_bat_level(struct power_supply *bat_ps)
 			battery->fg_skip_cnt = 0;
 		}
 	}
+#endif
 
 	if (battery->low_batt_boot_flag) {
 		fg_soc = 0;
@@ -600,20 +616,6 @@ static int p5_get_bat_level(struct power_supply *bat_ps)
 	} else
 		battery->recharging_cnt = 0;
 
-#if defined(CONFIG_KOR_OPERATOR_SKT) || defined(CONFIG_KOR_OPERATOR_KT) || defined(CONFIG_KOR_OPERATOR_LGU)
-	if (fg_vcell > battery->pdata->recharge_voltage) {
-		if (battery->info.batt_is_full &&
-			!battery->info.charging_enabled &&
-			!battery->fg_skip &&
-			//fg_soc < 99
-			max17042_chip_data->info.psoc < 9950) {
-			pr_info("%s: forcely, adjust full_cap! (%d)", __func__, fg_soc);
-			fg_set_full_charged();
-			fg_soc = get_fuelgauge_value(FG_LEVEL);
-			pr_info("%s: new soc = %d", __func__, fg_soc);
-		}
-	}
-#endif
 	if (fg_soc > 100)
 		fg_soc = 100;
 
@@ -918,10 +920,8 @@ static int p5_bat_get_charging_status(struct battery_data *battery)
 			if (battery->info.batt_is_full ||
 				battery->info.level == 100)
 				return POWER_SUPPLY_STATUS_FULL;
-#if !defined(CONFIG_KOR_OPERATOR_SKT) && !defined(CONFIG_KOR_OPERATOR_KT) && !defined(CONFIG_KOR_OPERATOR_LGU)
 			else if(battery->info.batt_improper_ta)
 				return POWER_SUPPLY_STATUS_DISCHARGING;
-#endif
 			else
 				return POWER_SUPPLY_STATUS_CHARGING;
 #endif
@@ -1057,6 +1057,9 @@ static struct device_attribute p5_battery_attrs[] = {
 	SEC_BATTERY_ATTR(charging_mode_booting),
 	SEC_BATTERY_ATTR(batt_lp_charging),
 #endif	
+#ifdef ENABLE_SYSFS_FG_CAPACITY
+	SEC_BATTERY_ATTR(fg_capacity),
+#endif
 };
 
 enum {
@@ -1087,6 +1090,9 @@ enum {
 	CHARGING_MODE_BOOTING,
 	BATT_LP_CHARGING,
 #endif	
+#ifdef ENABLE_SYSFS_FG_CAPACITY
+	FG_CAPACITY,
+#endif
 };
 
 static int p5_bat_create_attrs(struct device *dev)
@@ -1216,6 +1222,16 @@ static ssize_t p5_bat_show_property(struct device *dev,
 			test_batterydata->charging_mode_booting);
 		break;
 #endif		
+#ifdef ENABLE_SYSFS_FG_CAPACITY
+	case FG_CAPACITY:
+		i += scnprintf(buf + i, PAGE_SIZE - i,
+				"0x%04x 0x%04x 0x%04x 0x%04x\n",
+				get_fuelgauge_capacity(CAPACITY_TYPE_FULL),
+				get_fuelgauge_capacity(CAPACITY_TYPE_MIX),
+				get_fuelgauge_capacity(CAPACITY_TYPE_AV),
+				get_fuelgauge_capacity(CAPACITY_TYPE_REP));
+		break;
+#endif
 	default:
 		i = -EINVAL;
 	}
@@ -1812,7 +1828,7 @@ static irqreturn_t low_battery_isr(int irq, void *arg)
 {
 	struct battery_data *battery = (struct battery_data *)arg;
 	pr_debug("low battery isr");
-	cancel_delayed_work(&battery->fuelgauge_work);
+	__cancel_delayed_work(&battery->fuelgauge_work);
 	schedule_delayed_work(&battery->fuelgauge_work, 0);
 
 	return IRQ_HANDLED;
